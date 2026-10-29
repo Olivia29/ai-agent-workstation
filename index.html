@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>医生工作站 · 智能体集成（AI 算法应用卡片）V3.1</title>
+<title>医生工作站 · 智能体集成（AI 算法应用卡片）V3.2</title>
 <!--
+  版本：V3.2（2026-10-28）：「查看」改为有 AI 计算结果后才可用；未计算时置灰并提示"尚无 AI 计算结果"
   版本：V3.1（2026-10-28）：CT胸部AIR 补齐「查看」阅片链接（uiiyhym.imagecore.com.cn / StudyUID + app=3）
   版本：V3.0（2026-10-28）：右侧「调用应用」把通用「AI集成辅助诊断系统」卡片替换为具体算法应用卡片；
         新增 CT颅脑AIR / CT胸部AIR 两张卡片（适用模态·适用部位·厂商 + 右下角「AI计算」「查看」）；
@@ -629,10 +630,13 @@ function renderAgents(){
          +   '<div class="cacts">'
          +     '<button class="abtn calc" data-calc="'+a.id+'">AI计算</button>'
          +     '<button class="abtn view" data-view="'+a.id+'"'
-         +       (a.viewUrl?'':' disabled title="该应用暂未配置阅片链接"')+'>查看</button>'
+         +       ((a.viewUrl && a._st==='done') ? ''
+                       : ' disabled title="'+(a.viewUrl?'尚无 AI 计算结果，请先点「AI计算」':'该应用暂未配置阅片链接')+'"')+'>查看</button>'
          +   '</div>'
          +   '<div class="cstat'+(a._st==='running'?' on':'')+'" data-cstat="'+a.id+'">'
-         +     (a._st==='running'?'<i></i>AI 计算中…':(a._st==='done'?'<i class="ok"></i>计算已完成，可点「查看」':' '))
+         +     (a._st==='running' ? '<i></i>AI 计算中…'
+                 : (a._st==='done' ? '<i class="ok"></i>计算已完成，可点「查看」'
+                                   : '尚无 AI 计算结果'))
          +   '</div>'
          + '</div>';
       return;
@@ -1077,6 +1081,7 @@ function runAlgo(id){
 function openView(id){
   var a=AGENTS.filter(function(x){return x.id===id;})[0];
   if(!a) return;
+  if(a._st!=='done'){ toast(a.name+'：尚无 AI 计算结果，请先点「AI计算」'); return; }
   if(!a.viewUrl){ toast(a.name+'：暂未配置阅片链接，接入后即可查看结果'); return; }
   window.open(a.viewUrl,'_blank','noopener');
   toast('已在新标签页打开：'+a.name+' 阅片结果');
