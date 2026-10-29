@@ -3,9 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>医生工作站 · 智能体集成（AI集成辅助诊断系统）V2.0</title>
+<title>医生工作站 · 智能体集成（AI 算法应用卡片）V3.0</title>
 <!--
-  版本：V1.0（2026-10-17）
+  版本：V3.0（2026-10-28）：右侧「调用应用」把通用「AI集成辅助诊断系统」卡片替换为具体算法应用卡片；
+        新增 CT颅脑AIR / CT胸部AIR 两张卡片（适用模态·适用部位·厂商 + 右下角「AI计算」「查看」）；
+        「查看」在新标签页打开 air-viewer 阅片结果链接
+  历史：V1.0（2026-10-17）
   原型：浮梁县人民医院 医生工作站 —— 在「本院智能体」右侧栏新增「AI集成辅助诊断系统」，选择后打开系统诊断列表
   依据截图实测配色：主蓝 #1769AA / 正文 #1F3547 / 浅蓝底 #E8F2FB / 面板底 #F3F7FB / 页面底 #F7FAFE
   交互：打开方式（嵌入式 / 弹框式 / 双窗口 / 新TAB页）四种承载均可运行
@@ -289,6 +292,28 @@ td.ops .lnk:last-child{margin-right:0}
   .filters{grid-template-columns:repeat(2,1fr)}
   .kvs{grid-template-columns:repeat(2,1fr)}
 }
+.acard.algo{display:block;padding:11px 12px 9px;position:relative}
+.acard.algo .ahead{display:flex;align-items:flex-start;gap:9px}
+.acard.algo .ic{width:34px;height:34px;border-radius:9px;color:#fff;font-size:15px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex:0 0 34px}
+.acard.algo .nm{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:6px;line-height:1.4}
+.acard.algo .nv{font-size:11px;color:var(--muted);margin-top:2px}
+.acard.algo .ds{font-size:12px;color:var(--ink2);line-height:1.65;margin:8px 0 0}
+.acard.algo .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.acard.algo .meta span{font-size:11px;color:var(--muted);background:#F4F8FC;border:1px solid var(--line);
+  border-radius:20px;padding:2px 9px}
+.acard.algo .meta b{color:var(--ink);font-weight:700}
+.acard.algo .cacts{display:flex;justify-content:flex-end;gap:7px;margin-top:10px}
+.acard.algo .abtn{border-radius:5px;font-size:12px;padding:5px 13px;border:1px solid var(--blue);
+  background:var(--blue);color:#fff;font-weight:600}
+.acard.algo .abtn.view{background:#fff;color:var(--blue)}
+.acard.algo .abtn:hover{filter:brightness(.95)}
+.acard.algo .abtn:disabled{background:#F2F5F8;border-color:#DDE5EC;color:#A9B7C4;cursor:not-allowed}
+.acard.algo .cstat{font-size:11px;color:var(--muted);margin-top:7px;text-align:right;min-height:14px}
+.acard.algo .cstat i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--blue);
+  margin-right:5px;animation:pulse 1.2s infinite}
+.acard.algo .cstat i.ok{background:var(--green);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </head>
 <body>
@@ -429,9 +454,14 @@ console.log('医生工作站·智能体集成 V2.0 已加载');
 
 /* ---------------- 智能体清单 ---------------- */
 var AGENTS = [
-  { id:'ai-diag', name:'AI集成辅助诊断系统', ver:'v1', own:true, isNew:true,
-    desc:'汇总多模态影像 AI 结果，形成结构化辅助诊断意见，供医师参考。',
-    vendor:'影禾医脉（自研）', status:'ok', st:'已授权', ic:'诊', tint:'#00A398', openable:true },
+  { kind:'algo', id:'air-brain', name:'CT颅脑AIR', ver:'算法应用',
+    desc:'用于辅助识别颅脑平扫 CT 影像各类具有影像学征象变化的疾病。',
+    mod:'CT', part:'颅脑', vendor:'影禾', status:'ok', st:'已授权',
+    ic:'颅', tint:'#00A398', isNew:true, viewUrl:'https://air-viewer-internet.imagecore.com.cn/display/2C97A5552F6E4850A5D37BC1AE035193?studyId=719005155745664.20261029.14067685741137829161082760&orgId=2600012&type=aiAir&reportType=1&pacsType=display&pacsKey=2C97A5552F6E4850A5D37BC1AE035193&domainname=jhpacs.rimagdata.com' },
+  { kind:'algo', id:'air-chest', name:'CT胸部AIR', ver:'算法应用',
+    desc:'用于辅助识别胸部 CT 影像中的肺结节、实变等影像学征象，并输出结构化辅助诊断结果。',
+    mod:'CT', part:'胸部', vendor:'影禾', status:'ok', st:'已授权',
+    ic:'胸', tint:'#1769AA', isNew:true, viewUrl:'' },
   { id:'mr-qc', name:'病案首页质控系统', ver:'v1', desc:'辅助质量管理，不替代医院终末质控。',
     vendor:'惠每科技有限公司', status:'ok', st:'已授权', ic:'病', tint:'#4C9A7A' },
   { id:'emr-qc', name:'病历内涵质控系统', ver:'v1', desc:'辅助质量管理，不替代医院终末质控。',
@@ -579,6 +609,33 @@ function renderAgents(){
   var h='';
   AGENTS.forEach(function(a){
     var on = !!S.sel[a.id];
+    if(a.kind==='algo'){
+      h += '<div class="acard algo" data-aid="'+a.id+'">'
+         +   '<div class="ahead">'
+         +     '<div class="ic" style="background:'+a.tint+'">'+esc(a.ic)+'</div>'
+         +     '<div class="at" style="flex:1;min-width:0">'
+         +       '<div class="nm">'+esc(a.name)+(a.isNew?'<span class="bdg-new">新增</span>':'')+'</div>'
+         +       '<div class="nv">'+esc(a.ver)+' · '+esc(a.vendor)+'</div>'
+         +     '</div>'
+         +     '<span class="st '+(a.status==='ok'?'ok':'own')+'">'+esc(a.st)+'</span>'
+         +   '</div>'
+         +   '<div class="ds">'+esc(a.desc)+'</div>'
+         +   '<div class="meta">'
+         +     '<span>适用模态 <b>'+esc(a.mod)+'</b></span>'
+         +     '<span>适用部位 <b>'+esc(a.part)+'</b></span>'
+         +     '<span>厂商 <b>'+esc(a.vendor)+'</b></span>'
+         +   '</div>'
+         +   '<div class="cacts">'
+         +     '<button class="abtn calc" data-calc="'+a.id+'">AI计算</button>'
+         +     '<button class="abtn view" data-view="'+a.id+'"'
+         +       (a.viewUrl?'':' disabled title="该应用暂未配置阅片链接"')+'>查看</button>'
+         +   '</div>'
+         +   '<div class="cstat'+(a._st==='running'?' on':'')+'" data-cstat="'+a.id+'">'
+         +     (a._st==='running'?'<i></i>AI 计算中…':(a._st==='done'?'<i class="ok"></i>计算已完成，可点「查看」':' '))
+         +   '</div>'
+         + '</div>';
+      return;
+    }
     h += '<div class="acard'+(a.isNew?' new':'')+'" data-aid="'+a.id+'">'
        +   '<div class="cb'+(on?' on':'')+'" data-cb="'+a.id+'"></div>'
        +   '<div class="ic" style="background:'+a.tint+'">'+esc(a.ic)+'</div>'
@@ -995,9 +1052,34 @@ $('alist').addEventListener('click', function(e){
   }
   var op=e.target.closest('[data-open]');
   if(op){ e.stopPropagation(); selectAndOpen(op.getAttribute('data-open')); return; }
+  var calc=e.target.closest('[data-calc]');
+  if(calc){ e.stopPropagation(); runAlgo(calc.getAttribute('data-calc')); return; }
+  var vw=e.target.closest('[data-view]');
+  if(vw){ e.stopPropagation(); openView(vw.getAttribute('data-view')); return; }
   var card=e.target.closest('[data-aid]');
-  if(card){ selectAndOpen(card.getAttribute('data-aid')); }
+  if(card && !card.classList.contains('algo')){ selectAndOpen(card.getAttribute('data-aid')); }
 });
+
+/* AI计算：模拟发起 → 计算中 → 已完成 */
+function runAlgo(id){
+  var a=AGENTS.filter(function(x){return x.id===id;})[0];
+  if(!a) return;
+  if(a._st==='running'){ toast('该应用正在计算中，请稍候'); return; }
+  a._st='running'; renderAgents();
+  toast('已发起 AI 计算：'+a.name+'（模态 '+a.mod+' / 部位 '+a.part+'）');
+  setTimeout(function(){
+    a._st='done'; renderAgents();
+    toast(a.name+' 计算完成，可点「查看」打开结果');
+  }, 2200);
+}
+/* 查看：打开该应用的阅片结果 */
+function openView(id){
+  var a=AGENTS.filter(function(x){return x.id===id;})[0];
+  if(!a) return;
+  if(!a.viewUrl){ toast(a.name+'：暂未配置阅片链接，接入后即可查看结果'); return; }
+  window.open(a.viewUrl,'_blank','noopener');
+  toast('已在新标签页打开：'+a.name+' 阅片结果');
+}
 
 function selectAndOpen(id){
   var a=AGENTS.filter(function(x){return x.id===id;})[0];
