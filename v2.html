@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>医生工作站 · 智能体集成（AI集成辅助诊断系统）V2.0</title>
+<!--
+  版本：V1.0（2026-10-17）
+  原型：浮梁县人民医院 医生工作站 —— 在「本院智能体」右侧栏新增「AI集成辅助诊断系统」，选择后打开系统诊断列表
+  依据截图实测配色：主蓝 #1769AA / 正文 #1F3547 / 浅蓝底 #E8F2FB / 面板底 #F3F7FB / 页面底 #F7FAFE
+  交互：打开方式（嵌入式 / 弹框式 / 双窗口 / 新TAB页）四种承载均可运行
+  V2.0（2026-10-20）：诊断列表去掉状态页签改为全量展示；搜索增加患者号 / 计算时间 / AI结果（危急值·阴性·阳性·未知）；
+        检查时间与计算时间支持范围查询；列表扩为 16 列（检查时间、计算时间支持排序）；操作扩为 查看结果 / 重新计算 / 原始影像
+  演示数据：机构内 14 条检查为模拟数据，不连接真实 PACS/HIS 生产系统；诊断意见为 AI 汇总的文本结果，仅供医师参考
+-->
+<style>
+*{box-sizing:border-box}
+:root{
+  --blue:#1769AA; --blue-d:#125687; --blue-l:#E8F2FB; --blue-l2:#F2F7FC;
+  --ink:#1F3547; --ink2:#4A6070; --muted:#7B8FA0; --muted2:#9AAABA;
+  --line:#E4EDF5; --line2:#EEF3F8; --bg:#F7FAFE; --panel:#F3F7FB;
+  --teal:#00A398; --green:#0F9D58; --amber:#C2761B; --red:#C0392B;
+  --r:6px; --sh:0 8px 28px rgba(20,60,90,.14);
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:13px/1.55 "Microsoft YaHei","微软雅黑","PingFang SC",-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+.hidden{display:none!important}
+
+/* ---------- 顶栏 ---------- */
+.app{height:100vh;display:flex;flex-direction:column;min-height:0}
+.top{height:48px;flex:0 0 48px;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.his{background:var(--blue);color:#fff;font-size:11px;font-weight:700;letter-spacing:.5px;
+  padding:3px 7px;border-radius:4px}
+.brand b{font-size:15px;letter-spacing:.2px}
+.brand .sub{color:var(--muted);font-size:12.5px}
+.topr{display:flex;align-items:center;gap:10px}
+.tbtn{background:#fff;border:1px solid #D8E2EC;color:var(--ink);font-size:12.5px;
+  padding:5px 11px;border-radius:5px}
+.tbtn:hover{border-color:var(--blue);color:var(--blue)}
+.net{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px}
+.net i{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block}
+
+/* ---------- 主体三栏 ---------- */
+.body{flex:1;display:flex;min-height:0}
+.side{width:198px;flex:0 0 198px;background:#fff;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;overflow:auto}
+.grp{padding:12px 14px 6px;font-size:12px;color:var(--muted)}
+.grp .cnt{float:right;background:#EEF3F8;color:var(--muted);border-radius:9px;
+  padding:0 6px;font-size:11px}
+.nav{padding:0 8px}
+.nav a{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:5px;
+  color:var(--ink2);font-size:13px;text-decoration:none;margin-bottom:1px}
+.nav a:hover{background:var(--blue-l2)}
+.nav a.on{background:var(--blue-l);color:var(--blue);font-weight:600}
+.nav a i{font-style:normal;width:18px;height:18px;border-radius:4px;background:#EDF3F9;
+  color:var(--ink2);font-size:11px;display:flex;align-items:center;justify-content:center;flex:0 0 18px}
+.nav a.on i{background:#fff;color:var(--blue)}
+.visits{padding:0 8px 8px;overflow:auto}
+.vst{border:1px solid var(--line2);border-radius:6px;padding:7px 9px;margin-bottom:6px;
+  background:#fff;font-size:11.5px;color:var(--muted);cursor:pointer}
+.vst:hover{border-color:#CFE0EF}
+.vst.on{background:#16324A;border-color:#16324A;color:#C9DAE8}
+.vst b{display:block;color:var(--ink);font-size:12.5px;margin-bottom:2px}
+.vst.on b{color:#fff}
+.vst .tag{color:var(--green)}
+.vst.on .tag{color:#7FE0B0}
+.user{margin-top:auto;border-top:1px solid var(--line);padding:10px 14px;display:flex;
+  align-items:center;gap:9px}
+.user .av{width:28px;height:28px;border-radius:50%;background:var(--blue-l);color:var(--blue);
+  font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
+.user b{display:block;font-size:12.5px}
+.user small{color:var(--muted);font-size:11px}
+
+/* ---------- 病历主区 ---------- */
+.main{flex:1;min-width:0;overflow:auto;padding:16px 20px 26px}
+.crumb{color:var(--muted);font-size:12px;margin-bottom:10px}
+.pgh{color:var(--muted);font-size:12px;margin-bottom:2px}
+h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ver{font-size:11px;font-weight:400;color:var(--muted);background:#EEF3F8;
+  border-radius:4px;padding:2px 7px}
+.saveok{font-size:11.5px;font-weight:400;color:var(--muted);display:flex;align-items:center;gap:4px}
+.saveok i{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.psum{color:var(--muted);font-size:11.5px;margin-bottom:12px}
+.pcard{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+  display:grid;grid-template-columns:1.15fr 1fr 1.1fr 0.8fr;gap:14px;margin-bottom:14px}
+.pcard .pid{font-size:19px;font-weight:700;letter-spacing:.3px}
+.pcard .pmeta{color:var(--muted);font-size:11.5px;margin-top:2px}
+.kv small{display:block;color:var(--muted);font-size:11px;margin-bottom:2px}
+.kv span{font-size:12.5px}
+.kv .warn{color:var(--amber)}
+.sec{background:#fff;border:1px solid var(--line);border-radius:8px;padding:0 0 4px;margin-bottom:14px}
+.sech{display:flex;align-items:center;gap:9px;padding:12px 16px 10px;border-bottom:1px solid var(--line2)}
+.sech .no{background:var(--blue-l);color:var(--blue);font-weight:700;font-size:11px;
+  border-radius:4px;padding:2px 6px}
+.sech b{font-size:14px}
+.sech .d{color:var(--muted);font-size:11.5px}
+.sech .req{margin-left:auto;background:#FFF4DC;color:#9C6500;font-size:10.5px;
+  border-radius:3px;padding:2px 6px}
+.field{padding:10px 16px 2px}
+.field label{display:block;color:var(--muted);font-size:11.5px;margin-bottom:3px}
+.field .val{font-size:12.5px;line-height:1.65}
+.vitals{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 16px 6px}
+.vital{background:var(--blue-l2);border:1px solid var(--line2);border-radius:6px;padding:9px 11px}
+.vital small{display:block;color:var(--muted);font-size:11px}
+.vital b{font-size:17px;font-weight:700}
+.vital em{font-style:normal;color:var(--muted);font-size:11px;margin-left:3px}
+
+/* ---------- 右侧智能体栏 ---------- */
+.agentp{width:392px;flex:0 0 392px;background:var(--panel);border-left:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0}
+.aphead{padding:13px 16px 11px;border-bottom:1px solid var(--line);background:#fff;
+  display:flex;align-items:flex-start;justify-content:space-between}
+.aphead b{font-size:14px}
+.aphead small{display:block;color:var(--muted);font-size:11px;margin-top:1px}
+.x{background:none;border:none;font-size:18px;color:var(--muted);line-height:1;padding:2px 4px}
+.x:hover{color:var(--ink)}
+.apbody{flex:1;overflow:auto;padding:12px 16px 4px}
+.apsec{margin-bottom:14px}
+.aph{font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.aph .cnt{color:var(--blue);font-size:11.5px;font-weight:400}
+.aphint{color:var(--muted);font-size:11px;margin:2px 0 8px}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
+.modes button{background:#fff;border:1px solid #D8E2EC;color:var(--ink2);font-size:12px;
+  padding:6px 0;border-radius:5px}
+.modes button:hover{border-color:#B9D3E8}
+.modes button.on{background:var(--blue-l);border-color:#BBD8EE;color:var(--blue);font-weight:600}
+
+.alist{display:flex;flex-direction:column;gap:7px}
+.acard{background:#fff;border:1px solid var(--line);border-radius:7px;padding:10px 11px;
+  display:flex;gap:9px;cursor:pointer;position:relative}
+.acard:hover{border-color:#BBD8EE;box-shadow:0 2px 8px rgba(23,105,170,.07)}
+.acard.new{border-color:#9FD9D4;background:linear-gradient(180deg,#F3FCFB,#fff 58%)}
+.acard.new:hover{border-color:var(--teal);box-shadow:0 3px 12px rgba(0,163,152,.14)}
+.acard .cb{width:14px;height:14px;border:1.5px solid #C3D3E1;border-radius:3px;margin-top:3px;
+  flex:0 0 14px;background:#fff;display:flex;align-items:center;justify-content:center}
+.acard .cb.on{background:var(--blue);border-color:var(--blue)}
+.acard .cb.on:after{content:"";width:7px;height:4px;border-left:2px solid #fff;
+  border-bottom:2px solid #fff;transform:rotate(-45deg) translateY(-1px)}
+.acard .ic{width:30px;height:30px;border-radius:6px;flex:0 0 30px;color:#fff;font-size:13px;
+  font-weight:700;display:flex;align-items:center;justify-content:center;background:#7E9BB5}
+.acard .bd{flex:1;min-width:0}
+.acard .nm{font-size:12.8px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.acard .nv{color:var(--muted);font-size:10.5px;margin-top:1px}
+.acard .ds{color:var(--muted);font-size:11px;margin-top:3px;line-height:1.45}
+.acard .dv{color:var(--muted2);font-size:10.5px;margin-top:3px}
+.acard .st{position:absolute;right:10px;top:10px;font-size:10px;border-radius:9px;padding:1px 7px;
+  color:#fff;background:#8FA6B8}
+.acard .st.ok{background:var(--blue)}
+.acard .st.own{background:var(--teal)}
+.bdg-new{font-size:9.5px;background:var(--teal);color:#fff;border-radius:3px;padding:1px 5px;
+  font-weight:600;letter-spacing:.2px}
+.acard .go{position:absolute;right:10px;bottom:9px;font-size:11px;color:var(--blue);
+  border:1px solid #BBD8EE;border-radius:4px;padding:2px 8px;background:#fff}
+.acard .go:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.apfoot{border-top:1px solid var(--line);padding:10px 16px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;background:#fff}
+.apfoot span{color:var(--muted);font-size:10.5px}
+.primary{background:var(--blue);color:#fff;border:none;border-radius:5px;padding:7px 13px;
+  font-size:12.5px;font-weight:600;white-space:nowrap}
+.primary:hover{background:var(--blue-d)}
+
+#diagWrap{min-width:0;min-height:0;width:100%;height:100%;display:flex;flex-direction:column}
+#diagWrap.hidden{display:none!important}
+/* ---------- 系统诊断列表（V2.0：全量无页签 · 16 列 · 两列排序 · 时间范围） ---------- */
+.diag{display:flex;flex-direction:column;min-height:0;min-width:0;background:#fff;height:100%;width:100%}
+.dhead{padding:12px 16px 10px;border-bottom:1px solid var(--line);display:flex;min-width:0;
+  align-items:flex-start;justify-content:space-between;gap:10px}
+.dhead .tt{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.dhead .tt .lg{width:22px;height:22px;border-radius:5px;background:var(--teal);color:#fff;
+  font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.dhead .sb{color:var(--muted);font-size:11px;margin-top:3px;line-height:1.5}
+.dhead .sb b{color:var(--blue);font-weight:600}
+.dacts{display:flex;gap:7px;align-items:center}
+.filters{padding:10px 16px;border-bottom:1px solid var(--line2);background:var(--blue-l2);
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 10px;min-width:0}
+.f{display:flex;flex-direction:column;gap:3px;min-width:0}
+.f label{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.f input,.f select{border:1px solid #D8E2EC;border-radius:4px;padding:5px 7px;font-size:12px;
+  font-family:inherit;color:var(--ink);background:#fff;min-width:0;width:100%}
+.f input:focus,.f select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(23,105,170,.12)}
+.f .dr{display:flex;align-items:center;gap:4px}
+.f .dr input{padding:4px 4px;font-size:11.5px}
+.f .dr span{color:var(--muted2);font-size:10px;flex:0 0 auto}
+.fbtns{grid-column:1/-1;display:flex;gap:8px;align-items:center;padding-top:2px}
+.fbtns .sp{flex:1}
+.fbtns .tip{color:var(--muted);font-size:10.5px}
+.twrap{flex:1;overflow:auto;min-height:0;min-width:0}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px;min-width:1180px}
+thead th{position:sticky;top:0;background:#fff;color:var(--muted);font-weight:600;
+  text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+thead th.sortable{cursor:pointer;user-select:none}
+thead th.sortable:hover{color:var(--blue)}
+thead th.sortable .ar{font-size:9px;margin-left:3px;color:var(--muted2)}
+thead th.sortable.on{color:var(--blue)}
+thead th.sortable.on .ar{color:var(--blue)}
+tbody td{padding:6px 6px;border-bottom:1px solid var(--line2);vertical-align:middle;white-space:nowrap}
+tbody tr:hover td{background:#F7FBFE}
+td.mono{font-family:Consolas,Menlo,monospace;font-size:10.8px;letter-spacing:-.2px}
+td.nm{font-weight:600;color:var(--ink)}
+td.mut{color:var(--muted2)}
+th.ops,td.ops{position:sticky;right:0;background:#fff;
+  box-shadow:-7px 0 8px -7px rgba(16,42,66,.20);z-index:1}
+thead th.ops{z-index:3}
+tbody tr:hover td.ops{background:#F7FBFE}
+td.ops .lnk{margin-right:9px;font-size:11.5px;white-space:nowrap}
+td.ops .lnk:last-child{margin-right:0}
+.pill{display:inline-block;font-size:10.5px;border-radius:9px;padding:1px 7px;white-space:nowrap}
+.pill.done{background:#E6F4EA;color:#137333}
+.pill.run{background:#FFF4DC;color:#9C6500}
+.pill.wait{background:#EDF3F8;color:#5C7285}
+.pill.fail{background:#FCE8E6;color:#B3261E}
+.pill.read{background:var(--blue-l);color:var(--blue)}
+.pill.unread{background:#F0F3F6;color:#6B7F90}
+.pill.crit{background:#FDE7E5;color:#B3261E;border:1px solid #F6C9C4}
+.pill.pos{background:#FFF1E0;color:#9A5B00}
+.pill.neg{background:#E8F5EC;color:#1E6B3A}
+.pill.unk{background:#EEF1F4;color:#66798A}
+.lnk{color:var(--blue);cursor:pointer;font-size:12px;margin-right:10px}
+.lnk:hover{text-decoration:underline}
+.lnk.dis{color:var(--muted2);cursor:not-allowed;text-decoration:none}
+.dfoot{padding:8px 16px;border-top:1px solid var(--line);display:flex;align-items:center;min-width:0;
+  justify-content:space-between;color:var(--muted);font-size:11.5px;background:#fff;gap:12px;flex-wrap:wrap}
+.pager{display:flex;gap:5px;align-items:center}
+.pager button{background:#fff;border:1px solid #D8E2EC;border-radius:4px;padding:3px 8px;font-size:11.5px}
+.pager button:disabled{color:var(--muted2);cursor:default}
+.pager button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.empty{padding:34px;text-align:center;color:var(--muted);font-size:12.5px}
+
+/* 承载方式 */
+.host-embed{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);
+  border-radius:8px;overflow:hidden;background:#fff}
+.host-modal{position:fixed;inset:0;z-index:60;background:rgba(16,42,66,.42);
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.host-modal .diag{width:min(1400px,100%);height:min(820px,100%);border-radius:10px;
+  box-shadow:var(--sh);overflow:hidden}
+.host-dual{width:60%;flex:0 0 60%;border-left:1px solid var(--line);min-height:0;min-width:0;display:flex}
+.host-dual .diag{flex:1 1 auto;min-width:0;width:auto}
+.embedbar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--blue-l2);
+  border-bottom:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+/* 结果详情 */
+.modal{position:fixed;inset:0;z-index:80;background:rgba(16,42,66,.45);
+  display:flex;align-items:center;justify-content:center;padding:24px}
+.sheet{background:#fff;border-radius:10px;width:min(940px,100%);max-height:100%;
+  display:flex;flex-direction:column;box-shadow:var(--sh);overflow:hidden}
+.shead{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;
+  align-items:flex-start;justify-content:space-between}
+.shead b{font-size:14.5px}
+.shead small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.sbody{flex:1;overflow:auto;padding:14px 16px}
+.blk{border:1px solid var(--line);border-radius:7px;margin-bottom:11px;overflow:hidden}
+.blkh{padding:8px 12px;background:var(--blue-l2);font-size:12px;font-weight:600;
+  display:flex;align-items:center;gap:7px}
+.blkh .m{margin-left:auto;color:var(--muted);font-weight:400;font-size:10.5px}
+.blkb{padding:10px 12px}
+.kvs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 12px}
+.kvs div small{display:block;color:var(--muted);font-size:10.5px}
+.kvs div span{font-size:12px}
+.finding{display:flex;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line2);font-size:12px}
+.finding:last-child{border-bottom:none}
+.finding .idx{width:19px;height:19px;border-radius:50%;background:var(--blue-l);color:var(--blue);
+  font-size:10.5px;display:flex;align-items:center;justify-content:center;flex:0 0 19px;font-weight:700}
+.finding .ft{flex:1}
+.finding .ft b{font-weight:600}
+.finding .cf{color:var(--muted);font-size:10.5px}
+.report p{margin:0 0 8px;font-size:12.5px;line-height:1.8}
+.report .lb{color:var(--muted);font-size:11px;margin-bottom:3px}
+.adv{background:#FFF9E8;border:1px solid #F2E0B0;color:#7A5B14;border-radius:6px;
+  padding:8px 11px;font-size:11px;line-height:1.6;display:flex;gap:7px}
+.sfoot{padding:11px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+.ghost{background:#fff;border:1px solid #D8E2EC;color:var(--ink);border-radius:5px;
+  padding:7px 13px;font-size:12.5px}
+.ghost:hover{border-color:var(--blue);color:var(--blue)}
+
+/* toast */
+.toast{position:fixed;left:50%;top:22px;transform:translate(-50%,-14px);background:#16324A;
+  color:#fff;font-size:12.5px;padding:9px 16px;border-radius:6px;opacity:0;pointer-events:none;
+  transition:.22s;z-index:99;max-width:70vw}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* 窄屏 */
+@media (max-width:1180px){
+  .agentp{width:340px;flex-basis:340px}
+  .pcard{grid-template-columns:1fr 1fr}
+  .filters{grid-template-columns:repeat(2,1fr)}
+  .kvs{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="his">HIS</span>
+      <b>浮梁县人民医院</b><span class="sub">医生工作站</span>
+    </div>
+    <div class="topr">
+      <button class="tbtn" id="btnCallApp">调用应用</button>
+      <span class="net"><i></i>院内网络正常</span>
+      <button class="tbtn">退出登录</button>
+      <button class="tbtn">返回主页</button>
+    </div>
+  </header>
+
+  <div class="body" id="bodyRow">
+    <aside class="side">
+      <div class="grp">临床工作站</div>
+      <nav class="nav" id="nav">
+        <a href="javascript:;" data-v="opd"><i>诊</i>门诊工作站</a>
+        <a href="javascript:;" data-v="emr" class="on"><i>历</i>电子病历</a>
+        <a href="javascript:;" data-v="order"><i>嘱</i>医嘱管理</a>
+        <a href="javascript:;" data-v="exam"><i>检</i>检查检验</a>
+        <a href="javascript:;" data-v="rec"><i>案</i>病案首页</a>
+      </nav>
+      <div class="grp">历史就诊 <span class="cnt">4</span></div>
+      <div class="visits">
+        <div class="vst"><b>H00002</b><span>2023-08-08</span> · <span class="tag">已完成</span><br>门诊 · 肿瘤科</div>
+        <div class="vst"><b>H00002</b><span>2023-08-06</span> · <span class="tag">已完成</span><br>住院 · 肿瘤科</div>
+        <div class="vst"><b>H00005</b><span>2023-08-04</span> · <span class="tag">已完成</span><br>门诊 · 肿瘤科</div>
+        <div class="vst on"><b>H00005</b><span>2023-07-30</span> · 接诊中<br>住院 · 肿瘤科</div>
+      </div>
+      <div class="user"><span class="av">王</span><div><b>王建国</b><small>内科 · 主治医师</small></div></div>
+    </aside>
+
+    <main class="main" id="mainArea">
+      <div id="emrView">
+        <div class="crumb">用户使用端 / 电子病历</div>
+        <div class="pgh">住院电子病历</div>
+        <h1>H00005的住院病历 <span class="ver">病历版本 v1</span>
+          <span class="saveok"><i></i>编辑内容已暂存</span></h1>
+        <div class="psum">患者 H00005 · 编码 H00005 · 就诊 B01004150-0003 · 肿瘤科 · 2023-07-30 00:00:00</div>
+
+        <div class="pcard">
+          <div>
+            <div class="pid">H00005</div>
+            <div class="pmeta">男 · 78岁 · 患者ID H00005 · 编码 H00005</div>
+          </div>
+          <div class="kv"><small>就诊ID</small><span>B01004150-0003</span></div>
+          <div class="kv"><small>就诊科室</small><span>肿瘤科</span></div>
+          <div class="kv"><small>过敏史</small><span class="warn">待核实</span></div>
+        </div>
+
+        <section class="sec">
+          <div class="sech"><span class="no">01</span><b>病史采集</b>
+            <span class="d">患者主诉与现病史</span><span class="req">必填</span></div>
+          <div class="field"><label>主诉</label><div class="val">诊断：前列腺恶性肿瘤</div></div>
+          <div class="field"><label>现病史</label><div class="val">患者H00005，男，78岁。诊断：前列腺恶性肿瘤。起病以来精神、饮食及睡眠一般，大小便正常。</div></div>
+          <div class="field" style="padding-bottom:12px"><label>既往史</label>
+            <div class="val">既往体检，否认高血压、糖尿病等慢性病史；药物及食物过敏史待核实。</div></div>
+        </section>
+
+        <section class="sec">
+          <div class="sech"><span class="no">02</span><b>查体与检验</b>
+            <span class="d">体格检查及辅助检查结果</span></div>
+          <div class="vitals">
+            <div class="vital"><small>体温</small><b>36.8</b><em>℃</em></div>
+            <div class="vital"><small>脉搏</small><b>78</b><em>次/分</em></div>
+            <div class="vital"><small>呼吸</small><b>18</b><em>次/分</em></div>
+            <div class="vital"><small>血压</small><b>128/76</b><em>mmHg</em></div>
+          </div>
+          <div class="field" style="padding-bottom:14px"><label>辅助检查</label>
+            <div class="val" style="color:var(--muted)">相关检查结果待补充。</div></div>
+        </section>
+      </div>
+      <div id="embedHost" class="host-embed hidden"></div>
+    </main>
+
+    <aside class="agentp" id="agentPanel">
+      <div class="aphead">
+        <div><b>本院智能体</b><small>浮梁县人民医院 · 已购智能体</small></div>
+        <button class="x" id="apClose" title="收起">×</button>
+      </div>
+      <div class="apbody">
+        <div class="apsec">
+          <div class="aph">打开方式</div>
+          <div class="modes" id="modes">
+            <button data-mode="embed">嵌入式</button>
+            <button data-mode="modal" class="on">弹框式</button>
+            <button data-mode="dual">双窗口</button>
+            <button data-mode="tab">新TAB页</button>
+          </div>
+        </div>
+        <div class="apsec">
+          <div class="aph">选择本次使用的智能体 <span class="cnt" id="selCnt">0/7</span></div>
+          <div class="aphint">可多选，进入后仍可返回清单重新组合</div>
+          <div class="alist" id="alist"></div>
+        </div>
+      </div>
+      <div class="apfoot">
+        <span>授权机构：浮梁县人民医院</span>
+        <button class="primary" id="btnOpen">打开浏览器双窗口</button>
+      </div>
+    </aside>
+
+    <!-- 承载：双窗口（作为 .body 的第三列，必须留在 .body 内才能成为 flex 列） -->
+    <aside id="dualHost" class="host-dual hidden"></aside>
+  </div>
+</div>
+
+<!-- 承载：弹框 -->
+<div id="modalHost" class="host-modal hidden"></div>
+<!-- 诊断列表唯一实例（在三种承载间搬移，保留状态） -->
+<div id="diagWrap" class="hidden"></div>
+<!-- 结果详情 -->
+<div id="resModal" class="modal hidden"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* =========================================================================
+   医生工作站 · 智能体集成原型 V1.0
+   ========================================================================= */
+var S = {
+  mode: 'modal',
+  sel: {},
+  agentOpen: false,
+  diagOpen: false,
+  page: 1,
+  size: 10,
+  q: { org:'', name:'', pid:'', sid:'', tool:'', status:'', aiRes:'',
+       studyFrom:'', studyTo:'', calcFrom:'', calcTo:'' },
+  sort: { key:'study', dir:'desc' },
+  cur: null
+};
+console.log('医生工作站·智能体集成 V2.0 已加载');
+
+/* ---------------- 智能体清单 ---------------- */
+var AGENTS = [
+  { id:'ai-diag', name:'AI集成辅助诊断系统', ver:'v1', own:true, isNew:true,
+    desc:'汇总多模态影像 AI 结果，形成结构化辅助诊断意见，供医师参考。',
+    vendor:'影禾医脉（自研）', status:'ok', st:'已授权', ic:'诊', tint:'#00A398', openable:true },
+  { id:'mr-qc', name:'病案首页质控系统', ver:'v1', desc:'辅助质量管理，不替代医院终末质控。',
+    vendor:'惠每科技有限公司', status:'ok', st:'已授权', ic:'病', tint:'#4C9A7A' },
+  { id:'emr-qc', name:'病历内涵质控系统', ver:'v1', desc:'辅助质量管理，不替代医院终末质控。',
+    vendor:'惠每科技有限公司', status:'ok', st:'已授权', ic:'病', tint:'#4C9A7A' },
+  { id:'drg', name:'医保智能审核与DRG/DIP平台', ver:'v1', desc:'演示目录使用模拟数据，不连接真实医保生产系统。',
+    vendor:'国新健康保障服务集团股份有限公司', status:'no', st:'未配置前端', ic:'医', tint:'#8AA6C0' },
+  { id:'img-qc', name:'影像AI质控', ver:'v1', desc:'演示目录，不代表平台已接入厂商生产服务。',
+    vendor:'科大讯飞股份有限公司', status:'no', st:'未配置前端', ic:'影', tint:'#8AA6C0' },
+  { id:'rep-struct', name:'影像报告结构化助手', ver:'v1', desc:'将自由文本报告结构化为标准字段，便于统计与科研。',
+    vendor:'影禾医脉（自研）', status:'ok', st:'已授权', ic:'报', tint:'#00A398' },
+  { id:'critical', name:'危急值智能提醒', ver:'v1', desc:'对危急值类征象前置提醒，需院内危急值流程配合。',
+    vendor:'影禾医脉（自研）', status:'ok', st:'已授权', ic:'危', tint:'#00A398' }
+];
+
+/* ---------------- 诊断列表演示数据（模拟，不连生产系统）
+   字段：org 机构名称 / name 姓名 / pid 患者号 / sid 检查号 / study 检查时间 / calc 计算时间
+        tool AI工具 / mod 影像类型 / st 计算状态 / age 年龄 / aiRes AI结果
+        part 检查部位 / sex 性别 / rd 阅片状态 / doc 诊断医师 / seq 序列摘要
+   aiRes：crit 危急值 / pos 阳性 / neg 阴性 / unknown 未知（未算完或失败） ---------------- */
+var DIAG = [
+  { org:'浮梁县人民医院', name:'王建国', pid:'H00005', sid:'CT202307300012', study:'2023-07-30 09:12', calc:'2023-07-30 09:15',
+    tool:'肺结节检出（联影）', mod:'CT', st:'done', age:78, aiRes:'pos', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'2 序列 / 层厚 1.25mm',
+    out:{ findings:[
+      { t:'右肺上叶后段实性结节', v:'8.2 mm', extra:'边缘光整，Lung-RADS 3', cf:0.91 },
+      { t:'左肺下叶微小结节', v:'3.4 mm', extra:'Lung-RADS 2', cf:0.86 },
+      { t:'左肺下叶微小结节', v:'4.0 mm', extra:'Lung-RADS 2', cf:0.83 } ],
+      src:'联影 · 肺结节检出 v3.2（结构化文本结果）' } },
+  { org:'浮梁县人民医院', name:'王建国', pid:'H00005', sid:'CT202307300013', study:'2023-07-30 09:12', calc:'2023-07-30 09:14',
+    tool:'肺炎检出（推想）', mod:'CT', st:'done', age:78, aiRes:'neg', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'2 序列 / 层厚 1.25mm' },
+  { org:'浮梁县人民医院', name:'王建国', pid:'H00005', sid:'CT202307300014', study:'2023-07-30 09:12', calc:'2023-07-30 09:16',
+    tool:'纵隔淋巴结检出（推想）', mod:'CT', st:'done', age:78, aiRes:'pos', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'2 序列 / 层厚 1.25mm',
+    out:{ findings:[ { t:'纵隔淋巴结', v:'短径 7 mm', extra:'未见明显肿大', cf:0.88 } ],
+      src:'推想 · 纵隔淋巴结检出（结构化文本结果）' } },
+  { org:'浮梁县人民医院', name:'王建国', pid:'H00005', sid:'CT202307300015', study:'2023-07-30 09:12', calc:'2023-07-30 09:18',
+    tool:'肋骨骨折检出（推想）', mod:'CT', st:'done', age:78, aiRes:'pos', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'2 序列 / 层厚 1.25mm',
+    out:{ findings:[ { t:'右侧第 7 肋骨质连续性中断', v:'—', extra:'考虑陈旧性骨折', cf:0.74 } ],
+      src:'推想 · 肋骨骨折检出（结构化文本结果）' } },
+  { org:'浮梁县人民医院', name:'王建国', pid:'H00005', sid:'MR202307280031', study:'2023-07-28 15:40', calc:'2023-07-28 15:52',
+    tool:'颅脑转移瘤检出', mod:'MR', st:'run', age:78, aiRes:'unknown', part:'颅脑', sex:'男', rd:'unread', doc:'—', seq:'3 序列 / 层厚 5mm' },
+
+  { org:'浮梁县人民医院', name:'李秀兰', pid:'P00088', sid:'CT202307260008', study:'2023-07-26 10:05', calc:'2023-07-26 10:09',
+    tool:'肺结节检出（联影）', mod:'CT', st:'done', age:56, aiRes:'pos', part:'胸部', sex:'女', rd:'read', doc:'周敏', seq:'1 序列 / 层厚 1.25mm',
+    out:{ findings:[ { t:'右肺下叶磨玻璃结节', v:'6.1 mm', extra:'Lung-RADS 2', cf:0.89 } ],
+      src:'联影 · 肺结节检出 v3.2（结构化文本结果）' } },
+  { org:'浮梁县人民医院', name:'李秀兰', pid:'P00088', sid:'CT202307260009', study:'2023-07-26 10:05', calc:'2023-07-26 10:11',
+    tool:'冠脉钙化积分', mod:'CT', st:'done', age:56, aiRes:'pos', part:'胸部', sex:'女', rd:'read', doc:'周敏', seq:'1 序列 / 层厚 3mm' },
+  { org:'浮梁县人民医院', name:'张桂芳', pid:'P00102', sid:'CT202307240021', study:'2023-07-24 08:30', calc:'2023-07-24 08:36',
+    tool:'颅脑CTP灌注', mod:'CT', st:'done', age:63, aiRes:'crit', part:'颅脑', sex:'女', rd:'read', doc:'陈立', seq:'1 序列 / 层厚 5mm',
+    out:{ findings:[
+      { t:'右侧大脑中动脉供血区灌注减低', v:'CBF 下降 31%', extra:'核心梗死体积 42 mL', cf:0.90 },
+      { t:'MCA 供血区大面积缺血半暗带', v:'Tmax > 6s 体积 88 mL', extra:'需立即评估再灌注', cf:0.87 } ],
+      src:'联影 · 颅脑CTP（结构化文本结果）' } },
+  { org:'浮梁县人民医院', name:'赵德海', pid:'P00115', sid:'DR202307220045', study:'2023-07-22 14:20', calc:'2023-07-22 14:26',
+    tool:'胸片多病种检出', mod:'DR', st:'done', age:41, aiRes:'pos', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'正侧位 / 2 张' },
+  { org:'浮梁县人民医院', name:'孙玉梅', pid:'P00120', sid:'CT202307200033', study:'2023-07-20 11:15', calc:'',
+    tool:'肝脏病灶检出', mod:'CT', st:'wait', age:67, aiRes:'unknown', part:'腹部', sex:'女', rd:'unread', doc:'—', seq:'2 序列 / 层厚 5mm' },
+
+  { org:'浮梁县人民医院', name:'王建国', pid:'H00005', sid:'CT202307180011', study:'2023-07-18 16:40', calc:'2023-07-18 16:45',
+    tool:'肺结节随访对比', mod:'CT', st:'done', age:78, aiRes:'pos', part:'胸部', sex:'男', rd:'read', doc:'周敏', seq:'2 序列 / 层厚 1.25mm',
+    out:{ findings:[ { t:'右肺上叶结节（与 2023-01-12 对比）', v:'7.4 → 8.9 mm', extra:'增大 20%', cf:0.92 } ],
+      src:'影禾 · 随访对比（结构化文本结果）' } },
+  { org:'浮梁县人民医院', name:'刘建华', pid:'P00131', sid:'MR202307160022', study:'2023-07-16 09:05', calc:'2023-07-16 09:21',
+    tool:'颅脑转移瘤检出', mod:'MR', st:'done', age:55, aiRes:'pos', part:'颅脑', sex:'男', rd:'unread', doc:'—', seq:'3 序列 / 层厚 5mm' },
+  { org:'浮梁县人民医院', name:'陈美玲', pid:'P00140', sid:'CT202307140007', study:'2023-07-14 13:30', calc:'2023-07-14 13:33',
+    tool:'肺炎检出（推想）', mod:'CT', st:'fail', age:38, aiRes:'unknown', part:'胸部', sex:'女', rd:'unread', doc:'—', seq:'2 序列 / 层厚 1.25mm' },
+  { org:'浮梁县人民医院', name:'徐国强', pid:'P00142', sid:'CT202307120019', study:'2023-07-12 08:50', calc:'2023-07-12 08:56',
+    tool:'肺结节检出（联影）', mod:'CT', st:'done', age:80, aiRes:'pos', part:'胸部', sex:'男', rd:'read', doc:'陈立', seq:'2 序列 / 层厚 1.25mm' },
+
+  { org:'江西省人民医院', name:'胡雅琴', pid:'J00031', sid:'CT202307110022', study:'2023-07-11 10:20', calc:'2023-07-11 10:27',
+    tool:'肺结节检出（联影）', mod:'CT', st:'done', age:49, aiRes:'neg', part:'胸部', sex:'女', rd:'read', doc:'吴晓东', seq:'1 序列 / 层厚 1.25mm' },
+  { org:'江西省人民医院', name:'胡雅琴', pid:'J00031', sid:'CT202307110023', study:'2023-07-11 10:20', calc:'2023-07-11 10:29',
+    tool:'肺炎检出（推想）', mod:'CT', st:'done', age:49, aiRes:'neg', part:'胸部', sex:'女', rd:'read', doc:'吴晓东', seq:'1 序列 / 层厚 1.25mm' },
+  { org:'江西省人民医院', name:'邓志远', pid:'J00044', sid:'MR202307090015', study:'2023-07-09 15:05', calc:'2023-07-09 15:19',
+    tool:'颅脑转移瘤检出', mod:'MR', st:'done', age:61, aiRes:'crit', part:'颅脑', sex:'男', rd:'read', doc:'吴晓东', seq:'3 序列 / 层厚 5mm',
+    out:{ findings:[
+      { t:'左侧顶叶环形强化灶', v:'26 mm', extra:'周围水肿明显，中线右移 4 mm', cf:0.93 },
+      { t:'右侧小脑半球强化灶', v:'11 mm', extra:'考虑多发转移', cf:0.85 } ],
+      src:'联影 · 颅脑转移瘤检出（结构化文本结果）' } },
+  { org:'江西省人民医院', name:'邓志远', pid:'J00044', sid:'CT202307090016', study:'2023-07-09 15:05', calc:'2023-07-09 15:12',
+    tool:'纵隔淋巴结检出（推想）', mod:'CT', st:'done', age:61, aiRes:'pos', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'2 序列 / 层厚 1.25mm' },
+
+  { org:'十堰市太和医院', name:'罗小燕', pid:'S00077', sid:'CT202307080041', study:'2023-07-08 09:40', calc:'2023-07-08 09:47',
+    tool:'肋骨骨折检出（推想）', mod:'CT', st:'done', age:34, aiRes:'pos', part:'胸部', sex:'女', rd:'read', doc:'何静', seq:'2 序列 / 层厚 1.25mm',
+    out:{ findings:[ { t:'右侧第 5、6 肋骨质连续性中断', v:'—', extra:'断端轻度错位，考虑新鲜骨折', cf:0.87 } ],
+      src:'推想 · 肋骨骨折检出（结构化文本结果）' } },
+  { org:'十堰市太和医院', name:'罗小燕', pid:'S00077', sid:'DR202307080042', study:'2023-07-08 09:40', calc:'2023-07-08 09:44',
+    tool:'胸片多病种检出', mod:'DR', st:'done', age:34, aiRes:'neg', part:'胸部', sex:'女', rd:'read', doc:'何静', seq:'正侧位 / 2 张' },
+  { org:'十堰市太和医院', name:'马长林', pid:'S00089', sid:'CT202307060018', study:'2023-07-06 11:10', calc:'2023-07-06 11:16',
+    tool:'冠脉钙化积分', mod:'CT', st:'done', age:72, aiRes:'pos', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'1 序列 / 层厚 3mm' },
+  { org:'十堰市太和医院', name:'马长林', pid:'S00089', sid:'CT202307060019', study:'2023-07-06 11:10', calc:'2023-07-06 11:13',
+    tool:'肺结节检出（联影）', mod:'CT', st:'run', age:72, aiRes:'unknown', part:'胸部', sex:'男', rd:'unread', doc:'—', seq:'2 序列 / 层厚 1.25mm' },
+
+  { org:'湘潭市中心医院', name:'黄丽华', pid:'X00052', sid:'CT202307050027', study:'2023-07-05 14:50', calc:'2023-07-05 14:58',
+    tool:'肺结节随访对比', mod:'CT', st:'done', age:58, aiRes:'pos', part:'胸部', sex:'女', rd:'read', doc:'谭伟', seq:'2 序列 / 层厚 1.25mm' },
+  { org:'湘潭市中心医院', name:'黄丽华', pid:'X00052', sid:'CT202307050028', study:'2023-07-05 14:50', calc:'2023-07-05 15:01',
+    tool:'肝脏病灶检出', mod:'CT', st:'done', age:58, aiRes:'neg', part:'腹部', sex:'女', rd:'read', doc:'谭伟', seq:'2 序列 / 层厚 5mm' },
+  { org:'湘潭市中心医院', name:'曾宪明', pid:'X00063', sid:'MR202307030011', study:'2023-07-03 08:15', calc:'2023-07-03 08:31',
+    tool:'颅脑转移瘤检出', mod:'MR', st:'done', age:66, aiRes:'pos', part:'颅脑', sex:'男', rd:'unread', doc:'—', seq:'3 序列 / 层厚 5mm' },
+  { org:'湘潭市中心医院', name:'曾宪明', pid:'X00063', sid:'CT202307030012', study:'2023-07-03 08:15', calc:'2023-07-03 08:19',
+    tool:'颅脑CTP灌注', mod:'CT', st:'fail', age:66, aiRes:'unknown', part:'颅脑', sex:'男', rd:'unread', doc:'—', seq:'1 序列 / 层厚 5mm' }
+];
+
+var ST_MAP = { done:['done','已完成'], run:['run','计算中'], wait:['wait','待计算'], fail:['fail','失败'] };
+var RD_MAP = { read:['read','已阅片'], unread:['unread','未阅片'] };
+var AI_MAP = { crit:['crit','危急值'], pos:['pos','阳性'], neg:['neg','阴性'], unknown:['unk','未知'] };
+var ORGS = ['浮梁县人民医院','江西省人民医院','十堰市太和医院','湘潭市中心医院'];
+var TOOLS = ['肺结节检出（联影）','肺炎检出（推想）','纵隔淋巴结检出（推想）','颅脑转移瘤检出',
+             '冠脉钙化积分','颅脑CTP灌注','胸片多病种检出','肝脏病灶检出','肺结节随访对比','肋骨骨折检出（推想）'];
+/* 阳性/危急值但未单独写 findings 的行，按工具给一条默认检出，保证「查看结果」一致可用 */
+var TOOL_DEF = {
+  '肺结节检出（联影）':{ t:'肺结节', v:'6.8 mm', extra:'Lung-RADS 2', cf:0.88 },
+  '肺炎检出（推想）':{ t:'斑片状渗出影', v:'—', extra:'考虑炎性', cf:0.81 },
+  '纵隔淋巴结检出（推想）':{ t:'纵隔淋巴结', v:'短径 9 mm', extra:'建议结合增强', cf:0.84 },
+  '颅脑转移瘤检出':{ t:'颅内强化灶', v:'12 mm', extra:'考虑转移瘤', cf:0.86 },
+  '冠脉钙化积分':{ t:'冠状动脉钙化', v:'CAC 96', extra:'LAD 为主', cf:0.90 },
+  '颅脑CTP灌注':{ t:'灌注异常区', v:'CBF 下降 18%', extra:'需结合临床', cf:0.85 },
+  '胸片多病种检出':{ t:'肺野斑片影', v:'—', extra:'考虑炎性', cf:0.78 },
+  '肝脏病灶检出':{ t:'肝内低密度灶', v:'14 mm', extra:'建议增强 MRI 进一步评估', cf:0.80 },
+  '肺结节随访对比':{ t:'结节较前变化', v:'+1.2 mm', extra:'增大 15%', cf:0.89 },
+  '肋骨骨折检出（推想）':{ t:'肋骨骨折', v:'—', extra:'右侧第 7 肋', cf:0.76 }
+};
+/* 统一取结果：没有 out 的行按 AI结果 合成，避免「已完成却看不了结果」 */
+function getOut(r){
+  if(r.out) return r.out;
+  if(r.st!=='done') return null;
+  if(r.aiRes==='neg')
+    return { findings:[{ t:'未见明确异常征象', v:'—', extra:'阴性', cf:0.92 }],
+             src:r.tool+'（结构化文本结果）' };
+  if(r.aiRes==='pos'||r.aiRes==='crit'){
+    var d=TOOL_DEF[r.tool]||{ t:'检出异常征象', v:'—', extra:'详见结构化结果', cf:0.82 };
+    return { findings:[{ t:d.t, v:d.v, extra:d.extra, cf:d.cf }], src:r.tool+'（结构化文本结果）' };
+  }
+  return null;
+}
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg){
+  var t=$('toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(t._tm); t._tm=setTimeout(function(){ t.classList.remove('on'); },1900);
+}
+
+/* ---------------- 智能体列表 ---------------- */
+function renderAgents(){
+  var h='';
+  AGENTS.forEach(function(a){
+    var on = !!S.sel[a.id];
+    h += '<div class="acard'+(a.isNew?' new':'')+'" data-aid="'+a.id+'">'
+       +   '<div class="cb'+(on?' on':'')+'" data-cb="'+a.id+'"></div>'
+       +   '<div class="ic" style="background:'+a.tint+'">'+esc(a.ic)+'</div>'
+       +   '<div class="bd">'
+       +     '<div class="nm">'+esc(a.name)+(a.isNew?'<span class="bdg-new">新增</span>':'')+'</div>'
+       +     '<div class="nv">'+esc(a.name)+' · '+esc(a.ver)+'</div>'
+       +     '<div class="ds">'+esc(a.desc)+'</div>'
+       +     '<div class="dv">'+esc(a.vendor)+'</div>'
+       +   '</div>'
+       +   '<span class="st '+(a.status==='ok'?'ok':(a.own?'own':''))+'"'
+       +     (a.isNew?' style="background:#00A398"':'')+'>'+esc(a.st)+'</span>'
+       +   (a.openable?'<button class="go" data-open="'+a.id+'">打开</button>':'')
+       + '</div>';
+  });
+  $('alist').innerHTML = h;
+  var n=Object.keys(S.sel).filter(function(k){return S.sel[k];}).length;
+  $('selCnt').textContent = n+'/'+AGENTS.length;
+}
+
+/* ---------------- 打开方式 ---------------- */
+var MODE_LABEL = { embed:'打开（嵌入式）', modal:'打开（弹框式）', dual:'打开浏览器双窗口', tab:'在新标签页打开' };
+function setMode(m){
+  S.mode=m;
+  [].forEach.call(document.querySelectorAll('#modes button'),function(b){
+    b.classList.toggle('on', b.getAttribute('data-mode')===m);
+  });
+  $('btnOpen').textContent = MODE_LABEL[m] || '打开';
+}
+document.querySelectorAll('#modes button').forEach(function(b){
+  b.addEventListener('click', function(){ setMode(b.getAttribute('data-mode')); });
+});
+/* ---------------- 诊断列表：筛选 / 排序 / 渲染（全量，无分类页签） ---------------- */
+function rowsFiltered(){
+  var q=S.q;
+  var rows=DIAG.filter(function(r){
+    if(q.org && r.org!==q.org) return false;
+    if(q.name && r.name.indexOf(q.name)<0) return false;
+    if(q.pid && r.pid.toUpperCase().indexOf(q.pid.toUpperCase())<0) return false;
+    if(q.sid && r.sid.toUpperCase().indexOf(q.sid.toUpperCase())<0) return false;
+    if(q.tool && r.tool!==q.tool) return false;
+    if(q.status && r.st!==q.status) return false;
+    if(q.aiRes && r.aiRes!==q.aiRes) return false;
+    if(q.studyFrom && r.study.slice(0,10) < q.studyFrom) return false;
+    if(q.studyTo   && r.study.slice(0,10) > q.studyTo)   return false;
+    if(q.calcFrom && (!r.calc || r.calc.slice(0,10) < q.calcFrom)) return false;
+    if(q.calcTo   && (!r.calc || r.calc.slice(0,10) > q.calcTo))   return false;
+    return true;
+  });
+  var key=S.sort.key, dir=(S.sort.dir==='asc')?1:-1;
+  rows.sort(function(a,b){
+    var x=(key==='calc'?a.calc:a.study)||'';
+    var y=(key==='calc'?b.calc:b.study)||'';
+    if(!x && !y) return 0;
+    if(!x) return 1;               /* 无计算时间的行恒排最后 */
+    if(!y) return -1;
+    if(x===y) return 0;
+    return (x>y?1:-1)*dir;
+  });
+  return rows;
+}
+
+function selOpts(list,cur,all){
+  var h='<option value="">'+esc(all)+'</option>';
+  list.forEach(function(o){ h+='<option'+(cur===o?' selected':'')+'>'+esc(o)+'</option>'; });
+  return h;
+}
+function selOptsKV(map,cur,all){
+  var h='<option value="">'+esc(all)+'</option>';
+  Object.keys(map).forEach(function(k){
+    h+='<option value="'+k+'"'+(cur===k?' selected':'')+'>'+esc(map[k][1])+'</option>';
+  });
+  return h;
+}
+function thSort(label,key){
+  var on=(S.sort.key===key);
+  var ar=on?(S.sort.dir==='asc'?'▲':'▼'):'⇅';
+  return '<th class="sortable'+(on?' on':'')+'" data-sort="'+key+'">'+label
+       + '<span class="ar">'+ar+'</span></th>';
+}
+
+function renderDiag(){
+  var rows=rowsFiltered();
+  var maxPage=Math.max(1,Math.ceil(rows.length/S.size));
+  if(S.page>maxPage) S.page=maxPage;
+  var from=(S.page-1)*S.size, view=rows.slice(from,from+S.size);
+  var q=S.q;
+
+  var t=0,dn=0,cr=0,po=0,ne=0;
+  DIAG.forEach(function(r){ t++; if(r.st==='done')dn++; if(r.aiRes==='crit')cr++; if(r.aiRes==='pos')po++; if(r.aiRes==='neg')ne++; });
+
+  var body='';
+  if(!view.length){
+    body='<tr><td colspan="16"><div class="empty">没有符合条件的数据，请调整查询条件后重试</div></td></tr>';
+  } else {
+    view.forEach(function(r){
+      var sm=ST_MAP[r.st]||['wait','—'], am=AI_MAP[r.aiRes]||['unk','未知'];
+      body+='<tr>'
+        + '<td>'+esc(r.org)+'</td>'
+        + '<td class="nm">'+esc(r.name)+'</td>'
+        + '<td class="mono">'+esc(r.pid)+'</td>'
+        + '<td class="mono">'+esc(r.sid)+'</td>'
+        + '<td class="mono">'+esc(r.study)+'</td>'
+        + '<td class="mono'+(r.calc?'':' mut')+'">'+esc(r.calc||'—')+'</td>'
+        + '<td>'+esc(r.tool)+'</td>'
+        + '<td>'+esc(r.mod)+'</td>'
+        + '<td><span class="pill '+sm[0]+'">'+sm[1]+'</span></td>'
+        + '<td>'+r.age+'</td>'
+        + '<td><span class="pill '+am[0]+'">'+am[1]+'</span></td>'
+        + '<td>'+esc(r.part)+'</td>'
+        + '<td>'+esc(r.sex)+'</td>'
+        + '<td><span class="pill '+r.rd+'">'+(RD_MAP[r.rd]||['','—'])[1]+'</span></td>'
+        + '<td'+(r.doc==='—'?' class="mut"':'')+'>'+esc(r.doc||'—')+'</td>'
+        + '<td class="ops">'
+        +   (r.st==='done'
+              ? '<a class="lnk" data-res="'+esc(r.sid)+'">查看结果</a>'
+              : '<a class="lnk dis" title="尚未计算完成">查看结果</a>')
+        +   '<a class="lnk" data-recalc="'+esc(r.sid)+'">重新计算</a>'
+        +   '<a class="lnk" data-raw="'+esc(r.sid)+'">原始影像</a>'
+        + '</td>'
+        + '</tr>';
+    });
+  }
+
+  var pager='<button data-page="'+(S.page-1)+'"'+(S.page<=1?' disabled':'')+'>上一页</button>';
+  for(var p=1;p<=maxPage;p++) pager+='<button data-page="'+p+'" class="'+(p===S.page?'on':'')+'">'+p+'</button>';
+  pager+='<button data-page="'+(S.page+1)+'"'+(S.page>=maxPage?' disabled':'')+'>下一页</button>';
+
+  var filters='<div class="filters">'
+    + '<div class="f"><label>机构名称</label><select id="qOrg">'+selOpts(ORGS,q.org,'全部机构')+'</select></div>'
+    + '<div class="f"><label>姓名</label><input id="qName" value="'+esc(q.name)+'" placeholder="请输入姓名"></div>'
+    + '<div class="f"><label>患者号</label><input id="qPid" value="'+esc(q.pid)+'" placeholder="如 H00005"></div>'
+    + '<div class="f"><label>检查号</label><input id="qSid" value="'+esc(q.sid)+'" placeholder="如 CT202307300012"></div>'
+    + '<div class="f"><label>AI工具</label><select id="qTool">'+selOpts(TOOLS,q.tool,'全部工具')+'</select></div>'
+    + '<div class="f"><label>计算状态</label><select id="qStatus">'+selOptsKV(ST_MAP,q.status,'全部状态')+'</select></div>'
+    + '<div class="f"><label>AI结果</label><select id="qAiRes">'+selOptsKV(AI_MAP,q.aiRes,'全部结果')+'</select></div>'
+    + '<div class="f"><label>检查时间（范围）</label><div class="dr">'
+    +   '<input type="date" id="qSFrom" value="'+esc(q.studyFrom)+'"><span>至</span>'
+    +   '<input type="date" id="qSTo" value="'+esc(q.studyTo)+'"></div></div>'
+    + '<div class="f"><label>计算时间（范围）</label><div class="dr">'
+    +   '<input type="date" id="qCFrom" value="'+esc(q.calcFrom)+'"><span>至</span>'
+    +   '<input type="date" id="qCTo" value="'+esc(q.calcTo)+'"></div></div>'
+    + '<div class="f"><label>&nbsp;</label><div class="dr" style="color:var(--muted);font-size:10.5px;padding-top:5px">'
+    +   '按回车或「查询」生效</div></div>'
+    + '<div class="fbtns">'
+    +   '<button class="ghost" id="dQuery">查询</button>'
+    +   '<button class="ghost" id="dReset">重置</button>'
+    +   '<button class="ghost" id="dRefresh">刷新</button>'
+    +   '<span class="sp"></span>'
+    +   '<span class="tip">全量数据，不做分类页签切换</span>'
+    + '</div>'
+    + '</div>';
+
+  $('diagWrap').innerHTML =
+      '<div class="diag">'
+    +   '<div class="dhead"><div>'
+    +     '<div class="tt"><span class="lg">诊</span>AI集成辅助诊断系统 · 系统诊断列表</div>'
+    +     '<div class="sb">全量 <b>'+t+'</b> 条检查　已完成 <b>'+dn+'</b>　危急值 <b>'+cr+'</b>　阳性 <b>'+po+'</b>　阴性 <b>'+ne+'</b>'
+    +       '　|　16 列，窄屏可左右滑动</div>'
+    +   '</div><div class="dacts">'
+    +     '<button class="ghost" id="dClose">关闭</button>'
+    +   '</div></div>'
+    +   filters
+    +   '<div class="twrap"><table><thead><tr>'
+    +     '<th>机构名称</th><th>姓名</th><th>患者号</th><th>检查号</th>'
+    +     thSort('检查时间','study') + thSort('计算时间','calc')
+    +     '<th>AI工具</th><th>影像类型</th><th>计算状态</th><th>年龄</th><th>AI结果</th>'
+    +     '<th>检查部位</th><th>性别</th><th>阅片状态</th><th>诊断医师</th><th class="ops">操作</th>'
+    +   '</tr></thead><tbody>'+body+'</tbody></table></div>'
+    +   '<div class="dfoot"><span>共 <b style="color:var(--ink)">'+rows.length+'</b> 条'
+    +     (rows.length!==t?'（全量 '+t+' 条）':'')+' · 第 '+S.page+'/'+maxPage+' 页</span>'
+    +     '<div class="pager">'+pager+'</div></div>'
+    + '</div>';
+
+  bindDiag();
+}
+
+function bindDiag(){
+  var w=$('diagWrap');
+  var apply=function(resetPage){
+    var g=function(id){ var el=$(id); return el?el.value.trim():''; };
+    S.q.org=g('qOrg'); S.q.name=g('qName'); S.q.pid=g('qPid'); S.q.sid=g('qSid');
+    S.q.tool=g('qTool'); S.q.status=g('qStatus'); S.q.aiRes=g('qAiRes');
+    S.q.studyFrom=g('qSFrom'); S.q.studyTo=g('qSTo');
+    S.q.calcFrom=g('qCFrom'); S.q.calcTo=g('qCTo');
+    if(resetPage!==false) S.page=1;
+    renderDiag();
+  };
+
+  ['qOrg','qTool','qStatus','qAiRes','qSFrom','qSTo','qCFrom','qCTo'].forEach(function(id){
+    var el=$(id); if(el) el.onchange=function(){ apply(); };
+  });
+  ['qName','qPid','qSid'].forEach(function(id){
+    var el=$(id); if(el) el.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); apply(); } };
+  });
+
+  var qb=$('dQuery'); if(qb) qb.onclick=function(){ apply(); toast('已按当前条件查询'); };
+  var rb=$('dReset'); if(rb) rb.onclick=function(){
+    S.q={org:'',name:'',pid:'',sid:'',tool:'',status:'',aiRes:'',
+         studyFrom:'',studyTo:'',calcFrom:'',calcTo:''};
+    S.page=1; renderDiag(); toast('已重置查询条件');
+  };
+  var fb=$('dRefresh'); if(fb) fb.onclick=function(){ renderDiag(); toast('列表已刷新'); };
+  var cb=$('dClose'); if(cb) cb.onclick=function(){ closeDiag(); };
+
+  w.querySelectorAll('[data-sort]').forEach(function(th){
+    th.onclick=function(){
+      var k=th.getAttribute('data-sort');
+      if(S.sort.key===k){ S.sort.dir=(S.sort.dir==='asc'?'desc':'asc'); }
+      else { S.sort.key=k; S.sort.dir='desc'; }
+      apply(false);
+    };
+  });
+  w.querySelectorAll('[data-page]').forEach(function(b){
+    b.onclick=function(){ S.page=+b.getAttribute('data-page'); renderDiag(); };
+  });
+  w.querySelectorAll('[data-res]').forEach(function(a){
+    a.onclick=function(){ showResult(a.getAttribute('data-res')); };
+  });
+  w.querySelectorAll('[data-recalc]').forEach(function(a){
+    a.onclick=function(){ recalc(a.getAttribute('data-recalc')); };
+  });
+  w.querySelectorAll('[data-raw]').forEach(function(a){
+    a.onclick=function(){ showRaw(a.getAttribute('data-raw')); };
+  });
+}
+
+/* ---------------- 重新计算（演示：先切计算中，随后回写结果与计算时间） ---------------- */
+function recalc(sid){
+  var r=DIAG.filter(function(x){ return x.sid===sid; })[0];
+  if(!r) return;
+  var back={ st:r.st, aiRes:r.aiRes, rd:r.rd, doc:r.doc, out:r.out };
+  r.st='run'; r.calc=''; r.aiRes='unknown'; r.out=null; r.doc='—';
+  renderDiag(); toast('已提交重新计算：'+sid);
+  setTimeout(function(){
+    var d=new Date();
+    var p=function(n){ return (n<10?'0':'')+n; };
+    r.calc='2023-07-31 '+p(d.getHours())+':'+p(d.getMinutes());
+    r.st='done';
+    r.aiRes=(back.st==='done'? back.aiRes : 'pos');
+    r.out=back.out;
+    renderDiag();
+    toast('计算完成：'+sid+'（AI结果 '+((AI_MAP[r.aiRes]||['','未知'])[1])+'）');
+  },1500);
+}
+
+/* ---------------- 原始影像调阅（原型不内置影像，交代真实调阅路径） ---------------- */
+function showRaw(sid){
+  var r=DIAG.filter(function(x){ return x.sid===sid; })[0];
+  if(!r) return;
+  $('resModal').innerHTML =
+      '<div class="sheet" style="width:min(720px,100%)">'
+    + '<div class="shead"><div><b>原始影像调阅</b>'
+    +   '<small>'+esc(r.sid)+'　|　'+esc(r.name)+' '+esc(r.sex)+' '+r.age+'岁　|　'+esc(r.mod)+' '+esc(r.part)+'</small></div>'
+    +   '<button class="x" id="resX">×</button></div>'
+    + '<div class="sbody">'
+    +   '<div class="blk"><div class="blkh">检查信息<span class="m">来自院内 PACS</span></div>'
+    +     '<div class="blkb"><div class="kvs">'
+    +       '<div><small>机构</small><span>'+esc(r.org)+'</span></div>'
+    +       '<div><small>检查时间</small><span>'+esc(r.study)+'</span></div>'
+    +       '<div><small>序列</small><span>'+esc(r.seq)+'</span></div>'
+    +       '<div><small>诊断医师</small><span>'+esc(r.doc||'—')+'</span></div>'
+    +     '</div></div></div>'
+    +   '<div class="blk"><div class="blkh">调阅方式</div><div class="blkb">'
+    +     '<p style="margin:0;font-size:12.5px;line-height:1.9;color:var(--ink2)">'
+    +     '本原型不内置影像，实际部署按院内既有方式调阅影像：<br>'
+    +     '· 客户端：调用 PACS Viewer 打开该检查（检查号 / StudyInstanceUID 透传）<br>'
+    +     '· Web 端：以 DICOMweb 方式加载序列<br>'
+    +     '· 影像不出院，AI 只取文本结果</p>'
+    +     '</div></div>'
+    + '</div>'
+    + '<div class="sfoot">'
+    +   '<button class="ghost" id="rawX">关闭</button>'
+    +   '<button class="primary" id="rawGo">在 PACS 查看器打开</button>'
+    + '</div></div>';
+  $('resModal').classList.remove('hidden');
+  $('resX').onclick=function(){ $('resModal').classList.add('hidden'); };
+  $('rawX').onclick=function(){ $('resModal').classList.add('hidden'); };
+  $('rawGo').onclick=function(){
+    $('resModal').classList.add('hidden');
+    toast('已向 PACS 查看器发起调阅：'+r.sid);
+  };
+  $('resModal').onclick=function(e){ if(e.target===this) this.classList.add('hidden'); };
+}
+/* ---------------- 诊断结果详情 ---------------- */
+function showResult(sid){
+  var r=DIAG.filter(function(x){ return x.sid===sid; })[0];
+  var out=r?getOut(r):null;
+  if(!r || !out){ toast('该检查暂无结果'); return; }
+  S.cur=r;
+  var fs=out.findings.map(function(f,i){
+    return '<div class="finding"><span class="idx">'+(i+1)+'</span>'
+      + '<div class="ft"><b>'+esc(f.t)+'</b>　'+esc(f.v)
+      + '<div class="cf">'+esc(f.extra)+'　置信度 '+f.cf.toFixed(2)+'</div></div></div>';
+  }).join('');
+
+  var findingsText = out.findings.map(function(f){
+    return f.t + (f.v!=='—' ? '，'+f.v : '') + (f.extra&&f.extra!=='阴性' ? '，'+f.extra : '');
+  });
+  var impression = out.findings.map(function(f,i){
+    return (i+1)+'. '+f.t+(f.v!=='—'?'（'+f.v+'）':'')+
+      (f.extra&&f.extra!=='阴性'?'，'+f.extra:'，建议结合临床与既往影像随访。');
+  }).join('<br>');
+
+  $('resModal').innerHTML =
+    '<div class="sheet">'
+    + '<div class="shead"><div><b>'+esc(r.tool)+' · 诊断结果</b>'
+    +   '<small>检查号 '+esc(r.sid)+'　|　'+esc(r.pid)+' '+esc(r.name)+' '+esc(r.sex)+' '+r.age+'岁　|　'
+    +   esc(r.part)+' '+esc(r.mod)+'　|　'+esc(r.study)+'</small></div>'
+    +   '<button class="x" id="resX">×</button></div>'
+    + '<div class="sbody">'
+    +   '<div class="blk"><div class="blkh">检查信息<span class="m">数据来源：院内 PACS</span></div>'
+    +     '<div class="blkb"><div class="kvs">'
+    +       '<div><small>机构</small><span>'+esc(r.org)+'</span></div>'
+    +       '<div><small>检查号</small><span>'+esc(r.sid)+'</span></div>'
+    +       '<div><small>模态 / 部位</small><span>'+esc(r.mod)+' / '+esc(r.part)+'</span></div>'
+    +       '<div><small>序列</small><span>'+esc(r.seq)+'</span></div>'
+    +       '<div><small>检查时间</small><span>'+esc(r.study)+'</span></div>'
+    +       '<div><small>计算时间</small><span>'+esc(r.calc||'—')+'</span></div>'
+    +       '<div><small>AI结果</small><span>'+(AI_MAP[r.aiRes]||['','未知'])[1]+'</span></div>'
+    +       '<div><small>诊断医师</small><span>'+esc(r.doc||'—')+'</span></div>'
+    +     '</div></div></div>'
+    +   '<div class="blk"><div class="blkh">AI 检出结果<span class="m">'+esc(out.src)+'</span></div>'
+    +     '<div class="blkb">'+fs+'</div></div>'
+    +   '<div class="blk"><div class="blkh">综合辅助诊断意见<span class="m">由 AI 汇总各模型文本结果生成</span></div>'
+    +     '<div class="blkb report">'
+    +       '<div class="lb">影像所见</div><p>'
+    +         esc(r.part)+' '+esc(r.mod)+'：'+esc(findingsText.join('；'))+'。</p>'
+    +       '<div class="lb">诊断意见</div><p>'+impression+'</p>'
+    +     '</div></div>'
+    +   '<div class="adv">ⓘ 本结果由 AI 基于院内影像 AI 输出汇总生成，<b>仅供临床医师参考，不作为最终诊断依据</b>；'
+    +     '报告以医师签发为准。数据不出院，AI 结果仅以文本形式使用。</div>'
+    + '</div>'
+    + '<div class="sfoot">'
+    +   '<button class="ghost" id="resCopy">复制意见文本</button>'
+    +   '<button class="primary" id="resUse">引用到病历</button>'
+    + '</div></div>';
+  $('resModal').classList.remove('hidden');
+  $('resX').onclick=function(){ $('resModal').classList.add('hidden'); };
+  $('resCopy').onclick=function(){
+    var txt='影像所见：'+findingsText.join('；')+'。\n诊断意见：'+impression.replace(/<br>/g,'\n');
+    try{ navigator.clipboard.writeText(txt); toast('已复制诊断意见文本'); }
+    catch(e){ toast('当前浏览器不支持剪贴板，请手动选择复制'); }
+  };
+  $('resUse').onclick=function(){
+    $('resModal').classList.add('hidden'); closeDiag();
+    var el=document.querySelectorAll('#emrView .field .val')[2];
+    if(el){ el.textContent += '（AI 辅助诊断意见已引用，请医师核对后签发）'; }
+    toast('已将诊断意见引用到病历「既往史」下方，请医师核对');
+  };
+  $('resModal').onclick=function(e){ if(e.target===this) this.classList.add('hidden'); };
+}
+
+/* ---------------- 打开 / 关闭诊断列表 ---------------- */
+function openDiag(mode){
+  mode = mode || S.mode;
+  var w=$('diagWrap');
+  renderDiag();
+  ['embedHost','modalHost','dualHost'].forEach(function(id){ $(id).classList.add('hidden'); });
+  document.getElementById('bodyRow').classList.remove('dual-on');
+  $('emrView').classList.remove('hidden');
+
+  if(mode==='embed'){
+    var h=$('embedHost');
+    h.classList.remove('hidden');
+    h.innerHTML='<div class="embedbar"><span>嵌入式打开：AI集成辅助诊断系统</span>'
+      + '<span style="flex:1"></span><button class="ghost" id="embedBack" style="padding:3px 10px;font-size:11.5px">返回病历</button></div>';
+    h.appendChild(w);
+    $('emrView').classList.add('hidden');
+    w.classList.remove('hidden');
+    $('embedBack').onclick=function(){ closeDiag(); };
+  } else if(mode==='modal'){
+    $('modalHost').classList.remove('hidden');
+    $('modalHost').appendChild(w);
+    w.classList.remove('hidden');
+    $('modalHost').onclick=function(e){ if(e.target===this) closeDiag(); };
+  } else if(mode==='dual'){
+    var d=$('dualHost');
+    d.classList.remove('hidden');
+    d.appendChild(w);
+    w.classList.remove('hidden');
+    document.getElementById('bodyRow').classList.add('dual-on');
+    $('agentPanel').classList.add('hidden');
+  } else if(mode==='tab'){
+    var url=location.href.split('#')[0]+'#diag';
+    var win=window.open(url,'_blank');
+    if(!win){ toast('浏览器拦截了新标签页，请允许后重试'); return; }
+    toast('已在新标签页打开系统诊断列表');
+    return;
+  }
+  S.diagOpen=true;
+  console.log('诊断列表已打开，承载方式：'+mode);
+}
+function closeDiag(){
+  $('diagWrap').classList.add('hidden');
+  $('embedHost').classList.add('hidden');
+  $('modalHost').classList.add('hidden');
+  $('dualHost').classList.add('hidden');
+  $('emrView').classList.remove('hidden');
+  $('agentPanel').classList.remove('hidden');
+  S.diagOpen=false;
+}
+$('dClose') && ($('dClose').onclick=closeDiag);
+
+/* ---------------- 事件绑定 ---------------- */
+$('alist').addEventListener('click', function(e){
+  var cb=e.target.closest('[data-cb]');
+  if(cb){
+    e.stopPropagation();
+    var id=cb.getAttribute('data-cb');
+    S.sel[id]=!S.sel[id];
+    if(!S.sel[id]) delete S.sel[id];
+    renderAgents();
+    return;
+  }
+  var op=e.target.closest('[data-open]');
+  if(op){ e.stopPropagation(); selectAndOpen(op.getAttribute('data-open')); return; }
+  var card=e.target.closest('[data-aid]');
+  if(card){ selectAndOpen(card.getAttribute('data-aid')); }
+});
+
+function selectAndOpen(id){
+  var a=AGENTS.filter(function(x){return x.id===id;})[0];
+  if(!a) return;
+  if(!a.openable){ toast(a.name+'：该智能体未配置前端，暂不可打开'); return; }
+  S.sel[id]=true; renderAgents();
+  openDiag(S.mode);
+}
+
+$('btnOpen').onclick=function(){
+  var ids=Object.keys(S.sel).filter(function(k){return S.sel[k];});
+  if(!ids.length){ toast('请先勾选要使用的智能体'); return; }
+  var a=AGENTS.filter(function(x){return x.id===ids[0];})[0];
+  if(a && a.openable){ openDiag(S.mode); return; }
+  toast('已选择 '+ids.length+' 个智能体，当前演示仅「AI集成辅助诊断系统」已配置前端');
+};
+
+$('apClose').onclick=function(){
+  $('agentPanel').classList.add('hidden');
+  $('btnCallApp').focus();
+  toast('已收起智能体面板，可点顶栏「调用应用」重新打开');
+};
+$('btnCallApp').onclick=function(){
+  $('agentPanel').classList.remove('hidden');
+};
+
+document.querySelectorAll('#nav a').forEach(function(a){
+  a.onclick=function(){
+    document.querySelectorAll('#nav a').forEach(function(x){x.classList.remove('on');});
+    a.classList.add('on');
+    if(a.getAttribute('data-v')!=='emr') toast('原型仅演示「电子病历」页；智能体入口在右侧栏');
+  };
+});
+document.querySelectorAll('.vst').forEach(function(v){
+  v.onclick=function(){ document.querySelectorAll('.vst').forEach(function(x){x.classList.remove('on');}); v.classList.add('on'); };
+});
+
+/* ---------------- 初始化 ---------------- */
+renderAgents();
+setMode(S.mode);   /* 16 列在双窗口放不下，默认改为弹框式；四种方式仍可切换 */
+// 深链：#diag 直接打开诊断列表（供「新TAB页」使用）
+if(location.hash==='#diag'){ setTimeout(function(){ openDiag('modal'); },120); }
+</script>
+</body>
+</html>
